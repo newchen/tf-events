@@ -1,14 +1,34 @@
 // 自定义事件
-// todo: 添加可以先触发再监听功能
-
 export default {
-    _events: {},
-    _onceEvents: {},
+    _events: {}, // 事件
+    _onceEvents: {}, // 一次性事件
+    _emitThenOn: {}, // 先触发, 再监听
 
-    // todo: 可以订阅多个事件, 事件全部全部触发后再触发该回调, 类似Promise.all
-    all: function (names, callback) {
+    /*// 可以订阅多个事件, 事件全部触发后再触发该回调, 类似Promise.all
+    all: function (names) {
+        let args = [].slice.call(arguments, 1, -1)
+        let callback = [].slice.call(arguments, -1)[0];
 
-    },
+        if (args[0] === callback) {
+            if (typeof callback === 'function') {
+                args = []
+            } else {
+                callback = function() {}
+            }
+        }
+
+        if(typeof names === 'string') {
+            names = names.split(',')
+        }
+
+        names.forEach(function(v) {
+            this.emit.apply(this, v, args)
+        })
+
+        callback(args);
+
+        return this;
+    },*/
 
     // 触发自定义事件
     emit: function (name) {
@@ -17,20 +37,25 @@ export default {
         }
 
         var i = 0,
-            l = this._events[name].length;
+            l = this._events[name].length,
+            args = [].slice.call(arguments, 1);
 
         if (!l) {
             return this;
         }
 
         for (; i < l; i++) {
-            this._events[name][i].apply(this, [].slice.call(arguments, 1));
+            this._events[name][i].apply(this, args);
         }
 
         if (this._onceEvents[name]) {
+            this._events[name] = null;
+            this._onceEvents[name] = null;
             delete this._events[name];
             delete this._onceEvents[name];
         }
+
+        this._emitThenOn[name] = args;
 
         return this;
     },
@@ -39,6 +64,8 @@ export default {
     off: function (name, callback) {
         if (!(name || callback)) {
             this._events = {};
+            this._onceEvents = {};
+            this._emitThenOn = {};
             return this;
         }
 
@@ -51,7 +78,12 @@ export default {
                     }
                 }
             } else {
+                this._events[name] = null;
+                this._onceEvents[name] = null;
+                this._emitThenOn[name] = null;
                 delete this._events[name];
+                delete this._onceEvents[name];
+                delete this._emitThenOn[name];
             }
         }
 
@@ -65,6 +97,11 @@ export default {
         }
 
         this._events[name].push(fn);
+
+        //说明有缓存 可以执行
+        if (this._emitThenOn[name]) {
+            fn.apply(null, this._emitThenOn[name]);
+        }
 
         return this;
     },
@@ -80,7 +117,7 @@ export default {
         if (onceNameExist) return;
 
         this.on(name, fn);
-        this._onceEvents[name] = true;
+        this._onceEvents[name] = fn;
 
         return this;
     }

@@ -26,4 +26,34 @@ Events.once("onceClick", function (a, b) {
 });
 Events.emit("onceClick", "aa", "bb");
 Events.emit("onceClick", "aaa", "bbb");
+
+// 先触发再注册
+// Events.on("emit-then-on", function (a, b) {
+//     console.log('emit-then-on: 111', a, b);
+// });
+
+Events.emit("emit-then-on", 1, 2);
+
+Events.on("emit-then-on", function (a, b) {
+    console.log('emit-then-on: 222', a, b);
+});
+Events.on("emit-then-on", function (a, b) {
+    console.log('emit-then-on: 333', a, b);
+});
+
+setTimeout(() => {
+    Events.emit("emit-then-on", 3, 4);
+
+    setTimeout(() => {
+        Events.emit("emit-then-on", {a: 'aaa'});
+    }, 1000)
+}, 2000)
+```
+
+
+## 更新日志
+
+```
+1.0.7:
+    添加先触发再注册功能
 ```
