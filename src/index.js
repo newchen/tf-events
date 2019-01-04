@@ -1,29 +1,25 @@
-// 自定义事件
+// 自定义事件, 使用ES5语法编写
+var notIncludes = function (arr, fn) {
+    return arr.every(function(v) {
+        return v !== fn; 
+    })
+}
+
 export default {
     _events: {}, // 事件
-    _onceEvents: {}, // 一次性事件
-    _emitThenOn: {}, // 先触发, 再监听
+    _onceCache: {}, // 能同时注册多次, 但是执行一次后失效
+    _oneCache: {}, // 只能注册一次, 如果多次, 只有第一次的有效
+    _emitCache: {}, // 先触发, 再监听
+    /*
+    _allCache: { already: {}, wait: {} }, // 已经触发过的事件
 
-    /*// 可以订阅多个事件, 事件全部触发后再触发该回调, 类似Promise.all
-    all: function (names) {
-        let args = [].slice.call(arguments, 1, -1)
-        let callback = [].slice.call(arguments, -1)[0];
-
-        if (args[0] === callback) {
-            if (typeof callback === 'function') {
-                args = []
-            } else {
-                callback = function() {}
-            }
-        }
-
+    // 可以订阅多个事件, 事件全部触发后再触发该回调, 类似Promise.all
+    all: function (names, callback) {
         if(typeof names === 'string') {
             names = names.split(',')
         }
 
-        names.forEach(function(v) {
-            this.emit.apply(this, v, args)
-        })
+        this._allCache.wait = [names, callback];
 
         callback(args);
 
@@ -32,30 +28,42 @@ export default {
 
     // 触发自定义事件
     emit: function (name) {
+        var args = [].slice.call(arguments, 1);
+        // 存储触发事件的参数, 用于先触发, 再监听的情况
+        this._emitCache[name] = args;
+
+        // 存储触发过的事件
+        // this._allCache.already[name] = true;
+
         if (!this._events[name]) {
             return this;
         }
 
         var i = 0,
-            l = this._events[name].length,
-            args = [].slice.call(arguments, 1);
+            l = this._events[name].length;
 
         if (!l) {
             return this;
         }
 
+        var events = [],
+            onceEvents = this._onceCache[name] || [];
+        
         for (; i < l; i++) {
-            this._events[name][i].apply(this, args);
+            var fn = this._events[name][i];
+            fn.apply(this, args);
+
+            // fn不在onceEvents里面
+            if (notIncludes(onceEvents, fn)) {
+                events.push(fn)
+            }
         }
 
-        if (this._onceEvents[name]) {
-            this._events[name] = null;
-            this._onceEvents[name] = null;
-            delete this._events[name];
-            delete this._onceEvents[name];
-        }
+        // 执行过了, 置空
+        this._onceCache[name] = null;
 
-        this._emitThenOn[name] = args;
+        // 重置, 删除使用once注册的
+        this._events[name] = events; 
 
         return this;
     },
@@ -64,8 +72,9 @@ export default {
     off: function (name, callback) {
         if (!(name || callback)) {
             this._events = {};
-            this._onceEvents = {};
-            this._emitThenOn = {};
+            this._oneCache = {};
+            this._onceCache = {};
+            this._emitCache = {};
             return this;
         }
 
@@ -79,11 +88,9 @@ export default {
                 }
             } else {
                 this._events[name] = null;
-                this._onceEvents[name] = null;
-                this._emitThenOn[name] = null;
-                delete this._events[name];
-                delete this._onceEvents[name];
-                delete this._emitThenOn[name];
+                this._oneCache[name] = null;
+                this._onceCache[name] = null;
+                this._emitCache[name] = null;
             }
         }
 
@@ -96,29 +103,44 @@ export default {
             this._events[name] = [];
         }
 
-        this._events[name].push(fn);
+        // once的情况
+        if (arguments[2] !== true) {
+            this._events[name].push(fn);
+        }
 
-        //说明有缓存 可以执行
-        if (this._emitThenOn[name]) {
-            fn.apply(null, this._emitThenOn[name]);
+        //先触发, 再监听的情况
+        if (this._emitCache[name]) {
+            fn.apply(null, this._emitCache[name]);
+            // this._onceCache[name] = null;
         }
 
         return this;
     },
 
-    // 只执行一次的事件
-    once: function (name, fn) {
-        let onceNameExist = this._onceEvents[name];
+    // 只能注册一次, 如果多次, 只有第一次的有效
+    one: function (name, fn) {
+        var onceNameExist = this._oneCache[name];
 
-        if (this._events[name] && !onceNameExist) {
-            console.warn('你可能用on注册过该事件，不应该再用once注册，请换个名称');
+        if (onceNameExist) {
+            console.log(name + '事件只有第一次注册的有效')
+            return this;
         }
 
-        if (onceNameExist) return;
-
         this.on(name, fn);
-        this._onceEvents[name] = fn;
+        this._oneCache[name] = fn;
 
+        return this;
+    },
+
+    // 能同时注册多次, 但是执行一次后失效
+    once: function (name, fn) {
+        if (!this._onceCache[name]) {
+            this._onceCache[name] = [];
+        }
+
+        this._onceCache[name].push(fn)
+        this.on(name, fn, this._emitCache[name] ? true : false);
+        
         return this;
     }
 };

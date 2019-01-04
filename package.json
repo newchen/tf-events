@@ -1,6 +1,6 @@
 {
   "name": "tf-events",
-  "version": "1.0.7",
+  "version": "2.0.0",
   "description": "JS自定义事件",
   "main": "./dist/index.min.js",
   "scripts": {

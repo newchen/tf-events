@@ -17,12 +17,22 @@ Events.off("aclick");
 // 触发
 Events.emit("aclick", "a", "b");
 
-// 执行一次后自动注销
+// 只能注册一次
+Events.one("oneClick", function (a, b) {
+    console.log('one1', a, b);
+});
+Events.one("oneClick", function (a, b) {
+    console.log('one2', a, b);
+});
+Events.emit("oneClick", "aa", "bb");
+Events.emit("oneClick", "aaa", "bbb");
+
+// 能同时注册多次, 但是执行一次后失效
 Events.once("onceClick", function (a, b) {
-    console.log('111', a, b);
+    console.log('once1', a, b);
 });
 Events.once("onceClick", function (a, b) {
-    console.log('222', a, b);
+    console.log('once2', a, b);
 });
 Events.emit("onceClick", "aa", "bb");
 Events.emit("onceClick", "aaa", "bbb");
@@ -56,4 +66,13 @@ setTimeout(() => {
 ```
 1.0.7:
     添加先触发再注册功能
+
+2.0.0:
+    改写内部代码, once行为和1.x版本不一样了, 添加了one方法
+    once: 能同时注册多次, 但是执行一次后失效
+    one: 只能注册一次, 如果多次, 只有第一次的有效
+    on, one, once都支持先触发再注册功能
+
+    todo:
+        all方法支持: 可以订阅多个事件, 事件全部触发后再触发回调
 ```
